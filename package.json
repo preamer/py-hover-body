@@ -1,0 +1,45 @@
+{
+  "name": "py-hover-body",
+  "displayName": "Python Hover Body",
+  "description": "Show the full function implementation in the hover tooltip, without jumping to the definition",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "python",
+    "hover",
+    "function",
+    "implementation"
+  ],
+  "activationEvents": [
+    "onLanguage:python"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Python Hover Body",
+      "properties": {
+        "pyHoverBody.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show function implementations (full body) in the hover tooltip"
+        },
+        "pyHoverBody.maxLines": {
+          "type": "number",
+          "default": 200,
+          "description": "Maximum number of body lines to show (long functions get truncated)"
+        },
+        "pyHoverBody.delayMs": {
+          "type": "number",
+          "default": 300,
+          "description": "Delay before returning the implementation so it appears below the default Pylance hover (0 disables the delay)"
+        }
+      }
+    }
+  }
+}
