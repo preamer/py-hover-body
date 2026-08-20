@@ -3,6 +3,7 @@
   "displayName": "Python Hover Body",
   "description": "Show the full function implementation in the hover tooltip, without jumping to the definition",
   "version": "0.1.0",
+  "license": "MIT",
   "publisher": "local",
   "engines": {
     "vscode": "^1.75.0"
