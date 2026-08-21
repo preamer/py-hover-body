@@ -2,7 +2,7 @@
   "name": "py-hover-body",
   "displayName": "Python Hover Body",
   "description": "Show the full function implementation in the hover tooltip, without jumping to the definition",
-  "version": "0.1.0",
+  "version": "0.1.1"
   "license": "MIT",
   "publisher": "local",
   "engines": {
@@ -35,10 +35,10 @@
           "default": 200,
           "description": "Maximum number of body lines to show (long functions get truncated)"
         },
-        "pyHoverBody.delayMs": {
+        "pyHoverBody.pylanceWaitMs": {
           "type": "number",
           "default": 300,
-          "description": "Delay before returning the implementation so it appears below the default Pylance hover (0 disables the delay)"
+          "description": "Milliseconds to wait before returning the implementation hover, giving Pylance's hover time to resolve first so our block appears below it (0 = no wait)"
         }
       }
     }

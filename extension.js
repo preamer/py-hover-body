@@ -8,22 +8,30 @@
  *   - Hovering a call site or any reference shows the implementation labeled
  *     "Implementation:" BELOW the Pylance hover.
  *   - Hovering the definition itself keeps only the default hover.
+ *   - Hovering a function parameter (even when used inside the body) keeps
+ *     only the default hover, since the definition provider resolves it to
+ *     the parameter slot in the signature, not to the function itself.
  *
  * How it works:
  *   1. On hover, resolve the symbol under the cursor via Pylance's
  *      `vscode.executeDefinitionProvider` (handles imports and cross-file defs).
  *   2. Open the definition document, locate the `def` line and extract the
  *      whole block (decorators + signature + body) by indentation.
- *   3. VS Code merges hover providers' contents in promise-resolution order
- *      (see getHover.ts: fromPromisesResolveOrder), NOT registration order.
- *      Our extraction resolves faster than Pylance's hover, so we delay our
- *      own resolution (pyHoverBody.delayMs) to guarantee the implementation
- *      lands BELOW the default hover.
+ *   3. VS Code merges hover results in PROMISE RESOLUTION ORDER
+ *      (`AsyncIterableProducer.fromPromisesResolveOrder` in getHover.ts) —
+ *      registration order is irrelevant. Because our provider completes
+ *      quickly (definition lookup + local file read), it would normally
+ *      resolve before Pylance's heavier hover computation, causing our block
+ *      to appear ABOVE Pylance's. We therefore intentionally delay our
+ *      response by `pyHoverBody.pylanceWaitMs` milliseconds so that Pylance's
+ *      hover resolves first and our implementation lands below it.
  *   4. Return a Hover whose markdown is "**Implementation:**" followed by the
  *      extracted source as a highlighted code block.
  */
 
 const vscode = require('vscode');
+
+
 
 /** Extract `def` + body (plus decorators above) from a definition location. */
 async function extractImplementation(location) {
@@ -38,8 +46,23 @@ async function extractImplementation(location) {
     }
 
     const defLine = lines[defIndex];
-    if (!/^\s*(async\s+)?def\s/.test(defLine)) {
+    const defMatch = defLine.match(/^\s*(async\s+)?def\s+([A-Za-z_]\w*)/);
+    if (!defMatch) {
         return null; // not a function definition (e.g. variable, class)
+    }
+
+    // The definition provider resolves a parameter used inside the body to
+    // its slot in the signature (a range on the `def` line that starts after
+    // the function name). Only treat the target as "the function" when its
+    // range points at the function name itself; otherwise keep the default
+    // hover instead of dumping the whole implementation.
+    const startChar = location.range.start.character;
+    if (typeof startChar === 'number') {
+        const nameStart = defMatch.index + defMatch[0].indexOf(defMatch[2]);
+        const nameEnd = nameStart + defMatch[2].length;
+        if (startChar > nameEnd) {
+            return null; // definition points into the parameter list
+        }
     }
 
     // Base indent = the `def` line's indent; the body ends at the first
@@ -66,8 +89,8 @@ async function extractImplementation(location) {
     return slice.join('\n');
 }
 
-function activate(context) {
-    const provider = vscode.languages.registerHoverProvider('python', {
+function createHoverProvider() {
+    return vscode.languages.registerHoverProvider('python', {
         async provideHover(document, position) {
             const cfg = vscode.workspace.getConfiguration('pyHoverBody');
             if (!cfg.get('enabled', true)) {
@@ -102,11 +125,16 @@ function activate(context) {
                 return null;
             }
 
-            // Hover contents are merged in promise-resolution order; wait a bit so
-            // Pylance's content (resolved earlier) stays above ours.
-            const delayMs = cfg.get('delayMs', 500);
-            if (delayMs > 0) {
-                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            // VS Code renders hover results in promise-resolution order. Our
+            // provider finishes quickly (definition lookup + local file read)
+            // and would appear ABOVE Pylance's heavier hover computation.
+            // Waiting here gives Pylance's hover time to resolve first so our
+            // implementation block lands below it.
+            const waitMs = typeof global.__TEST_DELAYMS === 'number'
+                ? global.__TEST_DELAYMS
+                : vscode.workspace.getConfiguration('pyHoverBody').get('pylanceWaitMs', 300);
+            if (waitMs > 0) {
+                await new Promise((resolve) => setTimeout(resolve, waitMs));
             }
 
             const md = new vscode.MarkdownString();
@@ -115,7 +143,10 @@ function activate(context) {
             return new vscode.Hover(md, wordRange);
         },
     });
-    context.subscriptions.push(provider);
+}
+
+function activate(context) {
+    context.subscriptions.push(createHoverProvider());
 }
 
 function deactivate() {}

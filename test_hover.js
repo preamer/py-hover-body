@@ -3,6 +3,9 @@
 //   2) Hovering a call site -> Hover containing the implementation with the
 //      "**Implementation:**" label
 //   3) No definition -> null (default hover kept)
+//   4) Hovering a parameter used inside the body -> null (the definition
+//      provider resolves it to the parameter slot in the signature, which is
+//      NOT the function; only the default hover should be kept)
 'use strict';
 const path = require('path');
 const Module = require('module');
@@ -15,7 +18,7 @@ result = parse_config('a')
 `;
 
 global.__TEST_DOC = { getText: () => SRC };
-global.__TEST_DELAYMS = 0; // no artificial delay in tests
+global.__TEST_DELAYMS = 0; // disable the Pylance-ordering delay in tests
 
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
@@ -26,7 +29,11 @@ Module._resolveFilename = function (request, ...args) {
 const { activate } = require('./extension.js');
 
 const URI = { toString: () => 'file:///mock.py' };
-const defRange = (contains) => ({ start: { line: 0 }, end: { line: 2 }, contains });
+const defRange = (contains, startChar) => ({
+    start: { line: 0, character: startChar ?? 4 }, // function name `parse_config` starts at col 4
+    end: { line: 0, character: 100 },
+    contains,
+});
 const position = { line: 0, character: 0 };
 const document = {
     uri: URI,
@@ -60,6 +67,14 @@ function assert(cond, msg) {
     global.__TEST_DEFS = [];
     const r3 = await provider.provideHover(document, position);
     assert(r3 === null, 'no definition -> null (default hover kept)');
+
+    // 4) Hovering a parameter used inside the body: Pylance resolves it to the
+    //    parameter slot in the signature (line 0, inside the parens), so the
+    //    definition range does NOT point at the function name -> null
+    const paramCol = SRC.indexOf('general'); // 17: first occurrence is in the def line
+    global.__TEST_DEFS = [{ uri: URI, range: defRange(() => false, paramCol) }];
+    const r4 = await provider.provideHover(document, { line: 1, character: 30 });
+    assert(r4 === null, 'hover on parameter used in body -> null (default hover kept, no implementation)');
 
     console.log(process.exitCode ? 'SOME TESTS FAILED' : 'ALL HOVER TESTS PASSED');
 })();

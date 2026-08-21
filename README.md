@@ -20,6 +20,8 @@ original Pylance hover (signature + docstring). No navigation happens.
 - Supports `async def`, decorators and multi-line signatures
 - Long functions are truncated at 200 lines by default (configurable)
 - Hovering the definition itself keeps only the default hover (no duplicate implementation)
+- Hovering a function parameter (even when used inside the body) keeps only the
+  default hover — a parameter resolves to its slot in the signature, not to the function
 
 ## Install
 
@@ -52,16 +54,21 @@ and restart VS Code.
 |---|---|---|
 | `pyHoverBody.enabled` | `true` | Enable showing implementations on hover |
 | `pyHoverBody.maxLines` | `200` | Max body lines shown (long functions are truncated) |
-| `pyHoverBody.delayMs` | `300` | Delay before returning the implementation (ms). VS Code merges hover providers' contents in promise-resolution order, so the delay keeps our content below Pylance's; `0` disables the delay |
+| `pyHoverBody.pylanceWaitMs` | `300` | Milliseconds to wait before returning the implementation block, giving Pylance's hover time to resolve first so our block appears below it (set to `0` to disable) |
 
 ## How it works
 
 1. On hover, resolve the symbol under the cursor via `vscode.executeDefinitionProvider` (Pylance).
 2. Open the definition document, locate the `def` line and extract the whole block
    (decorators + signature + body) by indentation.
-3. VS Code merges hover providers' contents in promise-resolution order (see
-   `getHover.ts: fromPromisesResolveOrder`), so the implementation is delayed by
-   `delayMs` to land below the default hover.
+3. VS Code merges hover results in **promise-resolution order** (`AsyncIterableProducer.fromPromisesResolveOrder`
+   in `getHover.ts`) — registration order is irrelevant. Because this extension
+   completes quickly (definition lookup + local file read), it would normally
+   resolve before Pylance's heavier hover computation, causing the implementation
+   block to appear *above* Pylance's output. To avoid this, the extension
+   intentionally waits `pyHoverBody.pylanceWaitMs` milliseconds (default 300 ms)
+   after computing the body before returning, giving Pylance's hover time to
+   resolve first.
 4. Return a Hover whose markdown is `**Implementation:**` followed by the extracted
    source as a highlighted code block.
 

@@ -42,8 +42,8 @@ Module._resolveFilename = function (request, ...args) {
 
 const { extractImplementation } = require('./extension.js');
 
-function loc(line0) {
-    return { uri: { toString: () => 'file:///mock.py' }, range: { start: { line: line0 } } };
+function loc(line0, char0) {
+    return { uri: { toString: () => 'file:///mock.py' }, range: { start: { line: line0, character: char0 } } };
 }
 
 function assert(cond, msg) {
@@ -78,6 +78,18 @@ function assert(cond, msg) {
     // 5. Non-function definition -> null
     const body5 = await extractImplementation(loc(idxOf('x = 42')));
     assert(body5 === null, 'non-function returns null');
+
+    // 6. Definition pointing at a parameter slot in the signature -> null
+    //    (this is what Pylance returns when hovering a parameter used in the body)
+    const defIdx = idxOf('def parse_config');
+    const paramCol = lines[defIdx].indexOf('general');
+    const body6 = await extractImplementation(loc(defIdx, paramCol));
+    assert(body6 === null, 'parameter slot in signature returns null (not the function)');
+
+    // 7. Definition pointing at the function name -> still extracts
+    const nameCol = lines[defIdx].indexOf('parse_config');
+    const body7 = await extractImplementation(loc(defIdx, nameCol));
+    assert(body7.includes('def parse_config'), 'function name location still extracts');
 
     console.log(process.exitCode ? 'SOME TESTS FAILED' : 'ALL EXTRACTION TESTS PASSED');
 })();

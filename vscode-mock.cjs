@@ -6,21 +6,22 @@ module.exports = {
         getConfiguration: () => ({
             get: (key, def) => {
                 if (key === 'maxLines') return global.__TEST_MAXLINES ?? def;
-                if (key === 'delayMs') return global.__TEST_DELAYMS ?? def;
-                return def; // 'enabled' etc.
+                return def; // 'enabled', 'pylanceWaitMs', etc. — use defaults
             },
         }),
     },
-    commands: { executeCommand: async () => global.__TEST_DEFS || [] },
+    commands: {
+        executeCommand: async (cmd) => {
+            if (cmd === 'vscode.executeDefinitionProvider') return global.__TEST_DEFS || [];
+            return [];
+        },
+    },
     languages: {
         registerHoverProvider: (lang, provider) => {
             global.__LAST_PROVIDER = provider;
+            global.__REGISTRATION_COUNT = (global.__REGISTRATION_COUNT || 0) + 1;
             return { dispose() {} };
         },
-    },
-    extensions: {
-        getExtension: () => ({ isActive: true }), // assume Pylance already active
-        onDidChange: () => ({ dispose() {} }),
     },
     Hover: class { constructor(md, range) { this.md = md; this.range = range; } },
     MarkdownString: class {
