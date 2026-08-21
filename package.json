@@ -2,7 +2,7 @@
   "name": "py-hover-body",
   "displayName": "Python Hover Body",
   "description": "Show the full function implementation in the hover tooltip, without jumping to the definition",
-  "version": "0.1.1"
+  "version": "0.1.1",
   "license": "MIT",
   "publisher": "local",
   "engines": {
