@@ -1,0 +1,16 @@
+#!/bin/sh
+# Automatically append Claude co-authorship trailer to every commit.
+# Skips merge commits and commits that already carry the trailer.
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="$2"   # "merge", "squash", "commit" (amend), or empty (normal)
+
+# Don't touch merge commits
+[ "$COMMIT_SOURCE" = "merge" ] && exit 0
+
+TRAILER="Co-authored-by: Claude <noreply@anthropic.com>"
+
+# Only add if not already present
+if ! grep -qF "$TRAILER" "$COMMIT_MSG_FILE"; then
+    printf "\n%s\n" "$TRAILER" >> "$COMMIT_MSG_FILE"
+fi
